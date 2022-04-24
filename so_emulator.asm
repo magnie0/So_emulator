@@ -9,7 +9,7 @@ get_value: ; w r8w ma kod argumentu używa tylko rejestrów r8w,r9w, w al zwraca
     xor rax,rax
     cmp r8, 4
     jge get_value.greater_equal_4
-    mov rax, [r15 + r8] ; w r15 wskaznik na strukture
+    mov al, [r15 + r8] ; w r15 wskaznik na strukture
     ret 
 .greater_equal_4:
     xor rax,rax
@@ -49,6 +49,7 @@ put_value: ; w r8 co musimy wstawić w r11 numer kodu na który wstawiamy
     ret
 
 SET_Z_FLAG: ;flaga Z jest ustawiona odpowiednio nie zmieniać argumentu 8! bo tam jest wynik operacji; zmienia r9 używa
+    test r8, 000FFH ; jeśli dwa najmniej znaczące bity to 00
     jz SET_Z_FLAG.set_z
 .unset_z:
     mov byte [r15 + 7], 0 ; w r15 wskaznik na rel registers
@@ -56,8 +57,18 @@ SET_Z_FLAG: ;flaga Z jest ustawiona odpowiednio nie zmieniać argumentu 8! bo ta
 .set_z:
     mov byte [r15 + 7], 1
     ret
-SET_C_FLAG: ;flaga C jest ustawiona odpowiednio nie zmieniać argumentu 8! bo tam jest wynik operacji; zmienia r9 używa
-    jz SET_C_FLAG.set_c
+SET_C_FLAG: ;flaga C jest nie ustawiona; liczba przekroczyła zakres
+    cmp r8, 000FFH ; jeśli dwa najbardziej znaczące bity to 00
+    jg SET_Z_FLAG.set_z
+.unset_c:
+    mov byte [r15 + 6], 0 ; w r15 wskaznik na rel registers
+    ret
+.set_c:
+    mov byte [r15 + 6], 1
+    ret
+
+SET_C_FLAG_SET: ;flaga C jest ustawiona odpowiednio nie zmieniać argumentu 8! bo tam jest wynik operacji; zmienia r9 używa
+    jc SET_C_FLAG_SET.set_c
 .unset_c:
     mov byte [r15 + 6], 0 ; w r15 wskaznik na rel registers
     ret
@@ -65,8 +76,8 @@ SET_C_FLAG: ;flaga C jest ustawiona odpowiednio nie zmieniać argumentu 8! bo ta
     mov byte [r15 + 6], 1
     ret
 SET_C_LOCAL: ;ustawia lokalnie C flagę w zależności od C flagi w strukturze ; w r15 wskaznik na registers
-    mov rax, [r15 + 7]
-    cmp rax, 1
+    mov al, [r15 + 7]
+    cmp al, 1
     je SET_C_LOCAL.set_c_flag
     clc ; czyści carry flag
     ret
@@ -117,7 +128,10 @@ so_emul: ; rdi - kod; rsi - data; rdx - steps ;rcx - core;
     push r12 ; na nr instrukcji ktora teraez wykonuje 
     push r15 ; na rel registers
     lea r15, [rel registers]
-    mov r12, [r15 + 4]; która instrukcja teraz wykonywana numer
+    xor r12, r12
+    mov r12b, [r15 + 4]; która instrukcja teraz wykonywana numer
+    cmp rdx, 0 
+    je end_f
 next_instruction:
     xor r8, r8
     xor r9, r9
@@ -126,7 +140,7 @@ next_instruction:
     mov r8w, [rdi+r12*2]
 two_arguments:
     test r8w, 0C000H ; dwa najbardziej znaczące bity są zerami  czyli koniunkcja musi być 0
-    jnz RCR
+    jnz arg_and_imm
     shl r8w, 2
     shr r8w, 13
     call get_value ; wyliczamy arg2
@@ -172,19 +186,14 @@ two_arguments:
     jnz next
     call SBB_INSTR
     jmp next
-RCR:
-    ;test r10, 088FEH ;bo bity mają być 0111 0___ 0000 0001 gdzie _ to argument czyli w 1000 1___ 1111 1110 
-    ;jnz arg_and_imm
-    ; napisać ..................................................................................................................
-    
-    ;jmp next
 arg_and_imm:
     test r8w, 08000H; najbardziej znaczący bit musi być
-    jnz BRK ; do innej instrukcji może być jeszcze !!!!!!!!!!!!!!!!!!!!!!!!!!
+    jnz none_arg ; do innej instrukcji może być jeszcze !!!!!!!!!!!!!!!!!!!!!!!!!!
     shl r8w, 5 ; wyciągamy bity 3-5 licząc od najbardziej znaczących; wyciągamy argument
     shr r8w, 13; 16 - ile zostawiamy
     mov r11w, r8w ;pomocniczo zapisujemy arguemnt1 
     call get_value
+    mov r8b, al
     mov r9w, [rdi+r12*2]
     shl r9w, 8 ; obliczony imm8
     shr r9w, 8
@@ -204,50 +213,125 @@ arg_and_imm:
     call put_value
     jmp next
 .addi:
-    test r10, 5
+    test r10, 3
     jnz arg_and_imm.cmpi
     add r8w, r9w
     call SET_Z_FLAG
     call put_value
     jmp next
 .cmpi:
-    test r10, 5
-    jnz next
+    test r10, 2
+    jnz arg_and_imm.RCR
     cmp r8w, r9w
     call SET_Z_FLAG
     call SET_C_FLAG
     call put_value
     jmp next
+.RCR:
+    test r10, 1 ;bo bity mają być 0111 0___ 0000 0001 gdzie _ to argument czyli w 1000 1___ 1111 1110 
+    jnz next
+    ; napisać ..................................................................................................................
+    xor r8, r8
+    mov r8w, [rdi+r12*2]
+    shl r8w, 5 ; obliczony arg1
+    shr r8w, 13
+    mov r11b, r8b 
+    call get_value
+    mov r8b, al
+    ;dodaj  jak c jest
+    cmp [r15 + 6], byte 0
+    je .not_set_c
+    add r8, 000100H ;dodawanie tej jedynki ktorą przesuwamy
+.not_set_c:
+    rcr r8, 1
+    call SET_C_FLAG_SET
+    call put_value
+    jmp next
 BRK:
-    cmp r10, 0FFFFH
-    jne imm8
-    ; ???napisać ..................................................................................................................
+    cmp r8w, 0FFFFH
+    jne next
     add r12, 1; przechodzi na kolejny element moooooooooooooooddddddddddddullllllllo
     jmp end_f
-imm8: ;JMP 1100 0iii ssss ssss i - instrukcja s -stała czyli w koniunkcji 0011 1___ ___ ___ _ cokolwiek
-    test r10, 03800H
-    jnz none_arg
-    ;.............................................................................................
-    jmp next
 none_arg:
 .clc:
-    test r10, 08000H
-    jnz none_arg.stc
+    cmp r8w, 08000H
+    jne none_arg.stc
+    mov [r15 + 6], byte 0
     ;...........................................................
     jmp next
 .stc:
-    test r10, 08100H
+    cmp r8w, 08100H
+    jne imm8
+    mov [r15 + 6], byte 1
     jnz next
     ;...............................................................
+imm8: ;JMP 1100 0iii ssss ssss i - instrukcja s -stała czyli w koniunkcji 0011 1___ ___ ___ _ cokolwiek
+    test r8w, 03800H  
+    jnz next
+    xor r10,r10
+    mov r10w, [rdi+r12*2]
+    shl r10w, 5 ; obliczony instrukcje
+    shr r10w, 13
+    xor r8,r8 
+    mov r8w, [rdi+r12*2]
+    shl r8w, 8 ; obliczony imm8
+    shr r8w, 8
+    ; r10 instr r8 zmienna od skoku
+.JMP:
+    test r10, 7 ; bo jmp ma bity 000 więc w koniunkcji z 111 musi dać 0
+    jnz imm8.JNC
+    add r12w, r8w; overflow ?????????????????????????
+    jmp next
+.JNC:
+    test r10, 5 ; bo jmp ma bity 000 więc w koniunkcji z 111 musi dać 0
+    jnz imm8.JC
+    xor r9, r9
+    mov r9b, [r15 + 6] ; wartosc carry
+    cmp r9, 0 ; ma być zero
+    jne next
+    add r12w, r8w
+    jmp next
+.JC:
+    test r10, 4 ; bo jmp ma bity 000 więc w koniunkcji z 111 musi dać 0
+    jnz imm8.JNZ
+    xor r9, r9
+    mov r9b, [r15 + 6] ; wartosc carry
+    cmp r9, 1 ; ma być 1
+    jne next
+    add r12w, r8w
+    ;.............................................................................................
+    jmp next
+.JNZ:
+    test r10, 3 ; bo jmp ma bity 000 więc w koniunkcji z 111 musi dać 0
+    jnz imm8.JZ
+    xor r9, r9
+    mov r9b, [r15 + 7] ; wartosc carry
+    cmp r9, 0 ; ma być zero
+    jne next
+    add r12w, r8w 
+    ;.............................................................................................
+    jmp next
+.JZ:
+    test r10, 2 ; bo jmp ma bity 000 więc w koniunkcji z 111 musi dać 0
+    jnz next
+    xor r9, r9
+    mov r9b, [r15 + 7] ; wartosc carry
+    cmp r9, 1 ; ma być 1
+    jne next
+    add r12w, r8w 
+    ;.............................................................................................
+    jmp next
+
 next: ; w rdx steps
     dec rdx
-    lea r9, [rel registers]
+    ;mov r8, [r15+6] ;CCCCC
     add r12, 1
     cmp rdx, 0 
     jne next_instruction
 end_f:
-    mov [r15+4], r12
+    mov [r15+4], r12b
     mov rax, [rel registers]
+    mov r8, [r15+6] ;CCCCC
     pop r15
     pop r12
     ret
