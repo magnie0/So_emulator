@@ -1,7 +1,7 @@
 global so_emul
 
 section .bss
-    registers: resb 8 ; w rsi A, D, X, Y, PC, nieużyte, C, Z
+    registers: resb 8 ; A, D, X, Y, PC, nieużyte, C, Z
 
 section .text
 
@@ -9,10 +9,9 @@ get_value: ; w r8w ma kod argumentu używa tylko rejestrów r8w,r9w, w al zwraca
     xor rax,rax
     cmp r8, 4
     jge get_value.greater_equal_4
-    mov al, [r15 + r8] ; w r15 wskaznik na strukture
+    mov al, [r15 + r8] ; w r15 wskaznik na pierwszy element structury na strukture bierzemy 8 bitów z tablicy
     ret 
 .greater_equal_4:
-    xor rax,rax
     test r8, 00001H ; testuje bit ostatni odpowiedzialny za X czy Y 
     jz get_value.X
     mov al, [r15 + 3] ; bierzemy wartość y
@@ -20,7 +19,7 @@ get_value: ; w r8w ma kod argumentu używa tylko rejestrów r8w,r9w, w al zwraca
 .X:
     mov al, [r15 + 2] ; bierzemy wartość x
 .add_d:
-    test r8, 00002H ; sprawdzamy czy dodajemy D
+    test r8, 00002H ; sprawdzamy czy dodajemy D 
     jz get_value.value_from_adress
     add al, [r15 + 1] ; moooooooooooooodullllllllllllllloooooooooooooooooo %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 .value_from_adress:
@@ -125,7 +124,7 @@ SBB_INSTR: ; r8 arg1 wartosc ; r9 arg2/imm ; r11 kod argumentu1 gdzie zapisujemy
     ret
     
 so_emul: ; rdi - kod; rsi - data; rdx - steps ;rcx - core;
-    push r12 ; na nr instrukcji ktora teraez wykonuje 
+    push r12 ; na nr instrukcji ktora teraz wykonuje 
     push r15 ; na rel registers
     lea r15, [rel registers]
     xor r12, r12
@@ -322,15 +321,14 @@ imm8: ;JMP 1100 0iii ssss ssss i - instrukcja s -stała czyli w koniunkcji 0011 
     ;.............................................................................................
     jmp next
 
-next: ; w rdx steps
-    dec rdx
-    ;mov r8, [r15+6] ;CCCCC
-    add r12, 1
+next: 
+    dec rdx ; w rdx steps zmniejszenie wartości do wykonania
+    add r12, 1 ; w r12 którą instrukcję wykonuję
     cmp rdx, 0 
     jne next_instruction
 end_f:
-    mov [r15+4], r12b
-    mov rax, [rel registers]
+    mov [r15+4], r12b ; zaktualizowanie 
+    mov rax, [rel registers] ; wrzucenie tablicy do rax
     pop r15
     pop r12
     ret
