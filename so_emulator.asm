@@ -331,7 +331,6 @@ next: ; w rdx steps
 end_f:
     mov [r15+4], r12b
     mov rax, [rel registers]
-    mov r8, [r15+6] ;CCCCC
     pop r15
     pop r12
     ret
