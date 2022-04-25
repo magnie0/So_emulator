@@ -54,18 +54,9 @@ SET_Z_FLAG:                         ; flaga Z jest ustawiona odpowiednio nie zmi
 .set_z:
     mov byte [r15 + 7], 1
     ret
-SET_C_FLAG:                         ; flaga C jest nie ustawiona; liczba przekroczyła zakres
-    cmp r8, 000FFH                  ; jeśli dwa najbardziej znaczące bity to 00
-    jg SET_Z_FLAG.set_z
-.unset_c:
-    mov byte [r15 + 6], 0           ; w r15 wskaznik na rel registers
-    ret
-.set_c:
-    mov byte [r15 + 6], 1
-    ret
 
-SET_C_FLAG_SET:                     ; flaga C jest ustawiona odpowiednio nie zmieniać argumentu 8! bo tam jest wynik operacji; zmienia r9 używa
-    jc SET_C_FLAG_SET.set_c
+SET_C_FLAG:                     ; flaga C jest ustawiona odpowiednio nie zmieniać argumentu 8! bo tam jest wynik operacji; zmienia r9 używa
+    jc SET_C_FLAG.set_c
 .unset_c:
     mov byte [r15 + 6], 0           ; w r15 wskaznik na rel registers
     ret
@@ -109,15 +100,15 @@ SUB_INSTR:                          ; r8 arg1 wartosc ; r9 arg2 wartosc ; r11 ko
 ADC_INSTR:                          ; r8 arg1 wartosc ; r9 arg2 wartosc ; r11 kod argumentu1 gdzie zapisujemy
     call SET_C_LOCAL
     adc r8b, r9b
-    call SET_Z_FLAG
     call SET_C_FLAG
+    call SET_Z_FLAG
     call put_value
     ret
 SBB_INSTR:                          ; r8 arg1 wartosc ; r9 arg2 wartosc ; r11 kod argumentu1 gdzie zapisujemy
     call SET_C_LOCAL
     sbb r8b, r9b
-    call SET_Z_FLAG
     call SET_C_FLAG
+    call SET_Z_FLAG
     call put_value
     ret
     
@@ -220,8 +211,8 @@ arg_and_imm:
     test r10, 2
     jnz arg_and_imm.RCR
     cmp r8w, r9w
-    call SET_Z_FLAG
     call SET_C_FLAG
+    call SET_Z_FLAG
     call put_value
     jmp next
 .RCR:
@@ -239,7 +230,7 @@ arg_and_imm:
     add r8, 000100H                 ; dodawanie tej jedynki ktorą przesuwamy bo rcr na całym rejestrze jest
 .not_set_c:
     rcr r8, 1
-    call SET_C_FLAG_SET
+    call SET_C_FLAG
     call put_value
     jmp next
 BRK:
