@@ -137,10 +137,10 @@ two_arguments:
     mov r8w, [rdi+r12*2]
     shl r8w, 5
     shr r8w, 13
-    mov r11w, r8w                   ; skopiowwanie argumentu widoczonego
+    mov r11b, r8b                   ; skopiowwanie argumentu widoczonego
     call get_value                  ; wyliczamy arg1
-    mov r8w, ax                     ; wartość w arg1
-    mov r9w, r10w                   ; wartosć w arg2
+    mov r8b, al                     ; wartość w arg1
+    mov r9b, r10b                   ; wartosć w arg2
     mov r10w, [rdi+r12*2] 
     shl r10w, 13                    ; obliczamy instrukcje
     shr r10w, 13
@@ -196,24 +196,23 @@ arg_and_imm:
 .xori:
     test r10, 5
     jnz arg_and_imm.addi
-    xor r8w, r9w
+    xor r8b, r9b
     call SET_Z_FLAG
     call put_value
     jmp next
 .addi:
     test r10, 3
     jnz arg_and_imm.cmpi
-    add r8w, r9w
+    add r8b, r9b
     call SET_Z_FLAG
     call put_value
     jmp next
 .cmpi:
     test r10, 2
     jnz arg_and_imm.RCR
-    cmp r8w, r9w
+    sub r8b, r9b
     call SET_C_FLAG
     call SET_Z_FLAG
-    call put_value
     jmp next
 .RCR:
     test r10, 1                     ; bo bity muszą się kończyć na 1
